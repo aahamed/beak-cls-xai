@@ -11,6 +11,12 @@ CLASS_TO_IDX = {
     "Large" : 2,
 }
 
+IDX_TO_CLASS = {
+    0 : "Small",
+    1 : "Medium",
+    2 : "Large",
+}
+
 class BeakData( Dataset ):
 
     def __init__( self, data_dir, transforms=None ):

@@ -16,6 +16,9 @@ def get_explainer( xai_method, model ):
     if xai_method == 'gradcam':
         conv_layer = get_conv_layer_gradcam( model )
         return GradCamExplainer( model, conv_layer )
+    elif xai_method == 'guided-gradcam':
+        conv_layer = get_conv_layer_gradcam( model )
+        return GuidedGradCamExplainer( model, conv_layer )
     elif xai_method == 'integrated-gradients':
         return IGExplainer( model )
     elif xai_method == 'saliency':
@@ -45,9 +48,10 @@ class Explainer( object ):
         an explanation. The explanation is same resolution as img but with
         only 1 channel.
         '''
-        target = torch.tensor([[target]])
+        # import pdb; pdb.set_trace()
+        # target = torch.tensor([[target]])
         heatmap = self.method.attribute( img, target=target, **kwargs )
-        heatmap = heatmap.squeeze().mean( dim=0 )
+        heatmap = heatmap.squeeze().mean( dim=1 )
         return heatmap
 
 
@@ -70,29 +74,23 @@ class GradCamExplainer( Explainer ):
         heatmap = heatmap.squeeze()
         return heatmap
 
+class GuidedGradCamExplainer( Explainer ):
+
+    def __init__( self, model, conv_layer ):
+        super().__init__( model )
+        self.method = cattr.GuidedGradCam( model, conv_layer )
+    
 class IGExplainer( Explainer ):
 
     def __init__( self, model ):
         super( IGExplainer, self ).__init__( model )
         self.method = cattr.IntegratedGradients( model )
 
-    def explain_dep( self, img, target ):
-        target = torch.tensor([[target]])
-        heatmap = self.method.attribute( img, target=target )
-        heatmap = heatmap.squeeze().mean( dim=0 )
-        return heatmap
-
 class SaliencyExplainer( Explainer ):
 
     def __init__( self, model ):
         super( SaliencyExplainer, self ).__init__( model )
         self.method = cattr.Saliency( model )
-
-    def explain_dep( self, img, target ):
-        target = torch.tensor([[target]])
-        heatmap = self.method.attribute( img, target=target, abs=False )
-        heatmap = heatmap.squeeze().mean( dim=0 )
-        return heatmap
 
     def explain( self, img, target ):
         kwargs = {'abs':False}
