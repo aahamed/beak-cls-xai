@@ -129,3 +129,4 @@ MNIST
 .DS_Store
 *.swp
 *ignore*
+project/average-heatmaps/*
