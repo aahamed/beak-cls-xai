@@ -3,14 +3,8 @@ import json
 import os
 import pickle
 from argparse import ArgumentParser
+from project.dataset import Annotation
 
-class Annotation( object ):
-    
-    def __init__( self, img_file, keypoint=None, color=None ):
-        self.img_file = img_file
-        self.keypoint = keypoint
-        self.color = color
-        self.inconclusive = True if self.keypoint is None else False
         
 def read_ann( ann_file ):
     print(f'Parsing keypoint annotations in {ann_file}')
