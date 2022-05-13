@@ -55,6 +55,31 @@ class BeakData( Dataset ):
     def __len__( self ):
         return len( self.img_paths )
 
+class BeakDataKfold( BeakData ):
+
+    def __init__( self, data_dir, model_id,
+            ensemble_size, transforms=None ):
+        self.model_id = model_id
+        self.ensemble_size = ensemble_size
+        super().__init__( data_dir, transforms )
+
+    def setup( self ):
+        img_paths, labels = [], []
+        count = 0
+        for cls, idx in CLASS_TO_IDX.items():
+            cls_path = os.path.join(self.data_dir, cls)
+            cls_images = os.listdir( cls_path )
+            for img in cls_images:
+                if img.endswith(".jpg"):
+                    # skip ever k images
+                    k = count % self.ensemble_size
+                    count += 1
+                    if (k == self.model_id): continue
+                    img_paths.append( os.path.join(cls_path, img) )
+                    labels.append( idx )
+        return img_paths, labels
+            
+
 class BeakDataAnn( Dataset ):
 
     def __init__( self, data_dir, transforms=None ):
@@ -116,7 +141,8 @@ class BeakDataModule( LightningDataModule ):
             train_len = len( beak_dataset ) - val_len
             self.beak_train, self.beak_val = random_split( 
                     beak_dataset, [train_len, val_len],
-                    generator=torch.Generator().manual_seed(42) )
+                    # generator=torch.Generator().manual_seed(42)
+            )
         if stage == "test" or stage is None:
             test_dir = os.path.join(self.data_dir, "Test")
             self.beak_test = BeakData( test_dir, self.tf )
@@ -127,11 +153,11 @@ class BeakDataModule( LightningDataModule ):
 
     def val_dataloader(self):
         return DataLoader(self.beak_val, batch_size=self.batch_size,
-                num_workers=self.num_workers)
+                num_workers=self.num_workers, shuffle=False)
 
     def test_dataloader(self):
         return DataLoader(self.beak_test, batch_size=self.batch_size,
-                num_workers=self.num_workers)
+                num_workers=self.num_workers, shuffle=False)
     
 def collate_wrapper( batch ):
     import pdb; pdb.set_trace()
@@ -146,7 +172,6 @@ class BeakDataAnnModule( BeakDataModule ):
     def __init__( self, data_dir, batch_size, num_workers):
         super().__init__( data_dir, batch_size, num_workers )
 
-
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
             train_dir = os.path.join(self.data_dir, "Train")
@@ -156,25 +181,37 @@ class BeakDataAnnModule( BeakDataModule ):
             train_len = len( beak_dataset ) - val_len
             self.beak_train, self.beak_val = random_split( 
                     beak_dataset, [train_len, val_len],
-                    generator=torch.Generator().manual_seed(42) )
+                    # generator=torch.Generator().manual_seed(42)
+            )
         if stage == "test" or stage is None:
             test_dir = os.path.join(self.data_dir, "Test")
             self.beak_test = BeakDataAnn( test_dir, self.tf )
+
+class BeakDataKfoldModule( BeakDataModule ):
+
+    def __init__( self, data_dir, batch_size, num_workers,
+            model_id, ensemble_size):
+        super().__init__( data_dir, batch_size, num_workers )
+        self.model_id = model_id
+        self.ensemble_size = ensemble_size
+
+    def setup(self, stage=None):
+        if stage == "fit" or stage is None:
+            train_dir = os.path.join(self.data_dir, "Train")
+            beak_dataset = BeakDataKfold( train_dir, self.model_id,
+                    self.ensemble_size, self.tf )
+            self.num_classes = beak_dataset.num_classes
+            val_len = int( 0.1 * len( beak_dataset ) )
+            train_len = len( beak_dataset ) - val_len
+            self.beak_train, self.beak_val = random_split( 
+                    beak_dataset, [train_len, val_len],
+                    # generator=torch.Generator().manual_seed(42)
+            )
+        if stage == "test" or stage is None:
+            test_dir = os.path.join(self.data_dir, "Test")
+            self.beak_test = BeakDataKfold( test_dir, self.model_id,
+                    self.ensemble_size, self.tf )
     
-    def dep_train_dataloader(self):
-        return DataLoader(self.beak_train, batch_size=self.batch_size,
-                num_workers=self.num_workers, shuffle=True,
-                collate_fn=collate_wrapper)
-
-    def dep_val_dataloader(self):
-        return DataLoader(self.beak_val, batch_size=self.batch_size,
-                num_workers=self.num_workers,
-                collate_fn=collate_wrapper)
-
-    def dep_test_dataloader(self):
-        return DataLoader(self.beak_test, batch_size=self.batch_size,
-                num_workers=self.num_workers,
-                collate_fn=collate_wrapper)
 
 if __name__ == '__main__':
     import pdb; pdb.set_trace()

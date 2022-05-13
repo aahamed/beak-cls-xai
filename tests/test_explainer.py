@@ -18,6 +18,8 @@ def get_model():
     args = Args( backbone='resnet18' )
     model = BeakClassifier(args.backbone, args.learning_rate,
             args.num_classes, args.tune_mode)
+    model.to( config.DEVICE )
+    model.eval()
     return model    
 
 def test_explainer( xai_method ):
@@ -51,3 +53,6 @@ def test_lime():
     xai_method = 'lime'
     test_explainer( xai_method ) 
 
+def test_xrai():
+    xai_method = 'xrai'
+    test_explainer( xai_method ) 

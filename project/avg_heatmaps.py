@@ -1,6 +1,7 @@
 import h5py
 import os
 import numpy as np
+import project.utils as utils
 from project.utils import setup_logger, log
 from argparse import ArgumentParser
 
@@ -24,6 +25,8 @@ class AverageHeatmaps( object ):
         shape = h5_files['model0']['heatmaps'].shape
         f = h5py.File( save_path, 'w' )
         f.create_dataset('heatmaps', shape, dtype=np.float32)
+        N = shape[0]
+        f.create_dataset('coms', (N, 2), dtype=np.float32)
         h5_files['avg_model'] = f
 
         return h5_files
@@ -31,6 +34,11 @@ class AverageHeatmaps( object ):
     def close_h5_files( self ):
         for f in self.h5_files.values():
             f.close()
+    
+    def process_heatmap( self, heatmap ):
+        # zero out negative values
+        heatmap = ( heatmap > 0 ) * heatmap
+        return heatmap
 
     def run( self ):
         log('Averaging Heatmaps')
@@ -45,6 +53,13 @@ class AverageHeatmaps( object ):
                 ind_heatmaps.append( f['heatmaps'][i] )
             avg_heatmap = np.stack( ind_heatmaps ).mean( axis=0 )
             avg_heatmaps[i] = avg_heatmap
+        
+        # calculate com data
+        all_coms = self.h5_files['avg_model']['coms']
+        H, W = avg_heatmaps[0].shape
+        for i, heatmap in enumerate( avg_heatmaps ):
+            com = utils.get_com( heatmap )
+            all_coms[i] = com
         self.close_h5_files()
 
 def main():

@@ -4,6 +4,7 @@ import os
 import numpy as np
 import sys
 import project.config as config
+import project.utils as utils
 from argparse import ArgumentParser
 from project.beak_classifier import BeakClassifier 
 from project.dataset import BeakDataModule
@@ -46,7 +47,14 @@ class GenHeatmaps( object ):
         N = len( self.dataModule.beak_test )
         f = h5py.File( save_path, 'w' )
         f.create_dataset( 'heatmaps', (N, 224, 224), dtype=np.float32 )
+        f.create_dataset( 'coms', (N, 2), dtype=np.float32 )
         return f
+    
+    def process_heatmap( self, heatmap ):
+        # zero out negative values
+        heatmap = ( heatmap > 0 ) * heatmap
+        # scipy.ndimage.gaussian_filter
+        return heatmap
 
     def run( self ):
         log( f'Generating heatmaps using {self.xai_method}' )
@@ -66,12 +74,24 @@ class GenHeatmaps( object ):
             batch_acc = accuracy(preds.detach().cpu(), labels.cpu())
             # generate heatmaps
             heatmaps = self.explainer.explain( imgs, preds )
+            # import pdb; pdb.set_trace()
+            if True not in (heatmaps>0):
+                # import pdb; pdb.set_trace()
+                a = 1
             # store heatmaps in h5 file
             end = start + batch_size
             all_heatmaps[start:end] = heatmaps.detach().cpu().numpy()
             start = end
             log(f'batch[{batch_id+1}/{N}] acc: {batch_acc:.2f}')
         log(f'total acc: {accuracy.compute():.2f}')
+
+        # calculate com data
+        all_coms = self.h5_file['coms']
+        H, W = all_heatmaps[0].shape
+        for i, heatmap in enumerate( all_heatmaps ):
+            com = utils.get_com( heatmap )
+            all_coms[i] = com
+
         self.h5_file.close()
 
 def main():
@@ -80,7 +100,7 @@ def main():
             help='path to model')
     parser.add_argument('--xai-method', type=str, default='gradcam',
             choices=['gradcam', 'guided-gradcam', 'integrated-gradients',
-                'saliency', 'lime'],
+                'saliency', 'lime', 'xrai'],
             help='XAI method')
     parser.add_argument('--out-dir', type=str,
             help='Directory to store outputs')
