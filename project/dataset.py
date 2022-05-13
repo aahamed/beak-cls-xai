@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import pickle
+import random
 import torchvision.transforms as transforms
 import torch
 from torch.utils.data import Dataset, DataLoader, random_split
@@ -37,9 +38,11 @@ class BeakData( Dataset ):
 
     def setup( self ):
         img_paths, labels = [], []
-        for cls, idx in CLASS_TO_IDX.items():
+        classes, idxs = ['Small', 'Medium', 'Large'], [0, 1, 2]
+        for cls, idx in zip(classes, idxs):
             cls_path = os.path.join(self.data_dir, cls)
             cls_images = os.listdir( cls_path )
+            cls_images.sort()
             for img in cls_images:
                 if img.endswith(".jpg"):
                     img_paths.append( os.path.join(cls_path, img) )
@@ -55,6 +58,30 @@ class BeakData( Dataset ):
     def __len__( self ):
         return len( self.img_paths )
 
+class BeakDataBag( BeakData ):
+
+    def __init__( self, data_dir, transforms=None ):
+        super().__init__( data_dir, transforms )
+
+    def setup( self ):
+        img_paths, labels = [], []
+        classes, idxs = ['Small', 'Medium', 'Large'], [0, 1, 2]
+        for cls, idx in zip(classes, idxs):
+            cls_path = os.path.join(self.data_dir, cls)
+            cls_images = os.listdir( cls_path )
+            cls_images.sort()
+            for img in cls_images:
+                if img.endswith(".jpg"):
+                    img_paths.append( os.path.join(cls_path, img) )
+                    labels.append( idx )
+        bag_img_paths, bag_labels = [], []
+        N = len( img_paths )
+        for _ in range( N ):
+            r = random.randint( 0, N-1 )
+            bag_img_paths.append( img_paths[r] )
+            bag_labels.append( labels[r] )
+        return bag_img_paths, bag_labels
+
 class BeakDataKfold( BeakData ):
 
     def __init__( self, data_dir, model_id,
@@ -66,9 +93,11 @@ class BeakDataKfold( BeakData ):
     def setup( self ):
         img_paths, labels = [], []
         count = 0
-        for cls, idx in CLASS_TO_IDX.items():
+        classes, idxs = ['Small', 'Medium', 'Large'], [0, 1, 2]
+        for cls, idx in zip(classes, idxs):
             cls_path = os.path.join(self.data_dir, cls)
             cls_images = os.listdir( cls_path )
+            cls_images.sort()
             for img in cls_images:
                 if img.endswith(".jpg"):
                     # skip ever k images
@@ -78,7 +107,24 @@ class BeakDataKfold( BeakData ):
                     img_paths.append( os.path.join(cls_path, img) )
                     labels.append( idx )
         return img_paths, labels
-            
+
+def get_gt_coms( data_dir ):
+    root_dir = os.path.dirname( data_dir )
+    ann_path = os.path.join(root_dir, 'keypoints.pkl')
+    img_to_ann = pickle.load( open( ann_path, 'rb' ) )
+    coms = []
+    classes, idxs = ['Small', 'Medium', 'Large'], [0, 1, 2]
+    for cls, idx in zip(classes, idxs):
+        cls_path = os.path.join(data_dir, cls)
+        cls_images = os.listdir( cls_path )
+        cls_images.sort()
+        for img in cls_images:
+            if img.endswith(".jpg"):
+                ann = img_to_ann[img]
+                if ann.inconclusive: continue
+                com = np.array( list( ann.keypoint ) )
+                coms.append( com )
+    return coms
 
 class BeakDataAnn( Dataset ):
 
@@ -93,9 +139,11 @@ class BeakDataAnn( Dataset ):
         ann_path = os.path.join(root_dir, 'keypoints.pkl')
         img_to_ann = pickle.load( open( ann_path, 'rb' ) )
         img_paths, labels, anns = [], [], []
-        for cls, idx in CLASS_TO_IDX.items():
+        classes, idxs = ['Small', 'Medium', 'Large'], [0, 1, 2]
+        for cls, idx in zip(classes, idxs):
             cls_path = os.path.join(self.data_dir, cls)
             cls_images = os.listdir( cls_path )
+            cls_images.sort()
             for img in cls_images:
                 if img.endswith(".jpg"):
                     ann = img_to_ann[img]
@@ -125,6 +173,14 @@ class BeakDataModule( LightningDataModule ):
         self.batch_size = batch_size
         self.num_workers = num_workers
         img_size = ( 224, 224 )
+        policy = transforms.AutoAugmentPolicy.IMAGENET
+        self.train_tf = transforms.Compose([
+            transforms.Resize( img_size ),
+            transforms.AutoAugment(policy),
+            transforms.ToTensor(),
+            transforms.Normalize((0.485, 0.456, 0.406),
+                                (0.229, 0.224, 0.225)),
+        ])
         self.tf = transforms.Compose([
             transforms.Resize( img_size ),
             transforms.ToTensor(),
@@ -135,7 +191,7 @@ class BeakDataModule( LightningDataModule ):
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
             train_dir = os.path.join(self.data_dir, "Train")
-            beak_dataset = BeakData( train_dir, self.tf )
+            beak_dataset = BeakData( train_dir, self.train_tf )
             self.num_classes = beak_dataset.num_classes
             val_len = int( 0.1 * len( beak_dataset ) )
             train_len = len( beak_dataset ) - val_len
@@ -175,7 +231,7 @@ class BeakDataAnnModule( BeakDataModule ):
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
             train_dir = os.path.join(self.data_dir, "Train")
-            beak_dataset = BeakDataAnn( train_dir, self.tf )
+            beak_dataset = BeakDataAnn( train_dir, self.train_tf )
             self.num_classes = beak_dataset.num_classes
             val_len = int( 0.1 * len( beak_dataset ) )
             train_len = len( beak_dataset ) - val_len
@@ -199,7 +255,7 @@ class BeakDataKfoldModule( BeakDataModule ):
         if stage == "fit" or stage is None:
             train_dir = os.path.join(self.data_dir, "Train")
             beak_dataset = BeakDataKfold( train_dir, self.model_id,
-                    self.ensemble_size, self.tf )
+                    self.ensemble_size, self.train_tf )
             self.num_classes = beak_dataset.num_classes
             val_len = int( 0.1 * len( beak_dataset ) )
             train_len = len( beak_dataset ) - val_len
@@ -209,8 +265,31 @@ class BeakDataKfoldModule( BeakDataModule ):
             )
         if stage == "test" or stage is None:
             test_dir = os.path.join(self.data_dir, "Test")
-            self.beak_test = BeakDataKfold( test_dir, self.model_id,
-                    self.ensemble_size, self.tf )
+            # use unmodified dataset for testing
+            self.beak_test = BeakData( test_dir, self.tf )
+    
+
+class BeakDataBagModule( BeakDataModule ):
+
+    def __init__( self, data_dir, batch_size, num_workers):
+        super().__init__( data_dir, batch_size, num_workers )
+
+    def setup(self, stage=None):
+        if stage == "fit" or stage is None:
+            train_dir = os.path.join(self.data_dir, "Train")
+            beak_dataset = BeakDataBag( train_dir, self.train_tf )
+            self.num_classes = beak_dataset.num_classes
+            val_len = int( 0.1 * len( beak_dataset ) )
+            train_len = len( beak_dataset ) - val_len
+            self.beak_train, self.beak_val = random_split( 
+                    beak_dataset, [train_len, val_len],
+                    # generator=torch.Generator().manual_seed(42)
+            )
+        if stage == "test" or stage is None:
+            test_dir = os.path.join(self.data_dir, "Test")
+            # use unmodified dataset for testing
+            self.beak_test = BeakData( test_dir, self.tf )
+    
     
 
 if __name__ == '__main__':

@@ -50,12 +50,6 @@ class GenHeatmaps( object ):
         f.create_dataset( 'coms', (N, 2), dtype=np.float32 )
         return f
     
-    def process_heatmap( self, heatmap ):
-        # zero out negative values
-        heatmap = ( heatmap > 0 ) * heatmap
-        # scipy.ndimage.gaussian_filter
-        return heatmap
-
     def run( self ):
         log( f'Generating heatmaps using {self.xai_method}' )
         # import pdb; pdb.set_trace()

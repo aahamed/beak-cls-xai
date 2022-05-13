@@ -6,11 +6,13 @@ import pytorch_lightning as pl
 from argparse import ArgumentParser
 from project.backbones import get_backbone
 from project.dataset import BeakDataModule, \
-        BeakDataKfoldModule
+        BeakDataKfoldModule, BeakDataBagModule
 from torchvision import models
 from torch.nn import functional as F
 from torchmetrics.functional import accuracy
 from pytorch_lightning import loggers as pl_loggers
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+
 
 class BeakClassifier( pl.LightningModule ):
     
@@ -97,7 +99,7 @@ def cli_main():
     parser = pl.Trainer.add_argparse_args(parser)
     parser = BeakClassifier.add_model_specific_args(parser)
     args = parser.parse_args()
-    #pl.seed_everything(args.seed)
+    pl.seed_everything(args.seed)
 
     # ------------
     # data
@@ -110,9 +112,13 @@ def cli_main():
         beakDataModule = BeakDataKfoldModule( args.data_dir,
                 args.batch_size, args.num_workers,
                 args.seed%args.ens_size, args.ens_size )
+    elif args.data_method == 'bagging':
+        beakDataModule = BeakDataBagModule( args.data_dir,
+                args.batch_size, args.num_workers )
     else:
         raise Exception(f'Unrecognized data method: {args.data_method}')
 
+    
     # ------------
     # model
     # ------------
@@ -130,8 +136,11 @@ def cli_main():
             filename='best_model',
             save_last=True)
 
+    earlystopping_callback = EarlyStopping(
+            monitor="val_loss", mode="min", patience=3)
+
     trainer = pl.Trainer.from_argparse_args(args,
-            callbacks=[checkpoint_callback])
+            callbacks=[checkpoint_callback, earlystopping_callback])
     
     # logging
     logger = logging.getLogger("pytorch_lightning")
