@@ -68,6 +68,7 @@ class GenHeatmaps( object ):
             batch_acc = accuracy(preds.detach().cpu(), labels.cpu())
             # generate heatmaps
             heatmaps = self.explainer.explain( imgs, preds )
+
             # import pdb; pdb.set_trace()
             if True not in (heatmaps>0):
                 # import pdb; pdb.set_trace()
@@ -79,7 +80,8 @@ class GenHeatmaps( object ):
             log(f'batch[{batch_id+1}/{N}] acc: {batch_acc:.2f}')
         log(f'total acc: {accuracy.compute():.2f}')
 
-        # calculate com data
+        # calculate com data in separate loop
+        # in case batch_size > 1
         all_coms = self.h5_file['coms']
         H, W = all_heatmaps[0].shape
         for i, heatmap in enumerate( all_heatmaps ):

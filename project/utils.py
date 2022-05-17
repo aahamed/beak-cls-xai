@@ -36,6 +36,13 @@ def process_heatmap( heatmap ):
     heatmap = abs( heatmap )
     # smooth heatmap
     heatmap = gaussian_filter(heatmap, sigma=2)
+    # normalize
+    heatmap = heatmap - heatmap.min()
+    heatmap = heatmap / heatmap.max()
+    assert heatmap.min() == 0
+    assert heatmap.max() == 1
+    # thresholding
+    heatmap[ heatmap < 0.3 ] = 0
     return heatmap
 
 def get_com( heatmap ):
@@ -48,7 +55,7 @@ def get_com( heatmap ):
         assert com[0] >= 0 and com[1] >= 0
         assert com[0] <= 1 and com[1] <= 1
     except:
-        # import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
         a = 1
         com = [0, 0]
     return com
