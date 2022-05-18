@@ -40,8 +40,11 @@ class EvaluateHeatmaps( object ):
         ens_distances = []
         avg_distances = []
         N = len( testloader )
-        for i, ( _, _, gt_com ) in enumerate( testloader ):
+        for i, ( _, _, gt_com, valid ) in enumerate( testloader ):
             log( f'processing heatmap [{i+1}/{N}]' )
+            if not valid:
+                log('Skipping since gt com not valid')
+                continue
             gt_com = gt_com.numpy()
             for key, f in self.h5_files.items():
                 if key == 'avg_model': continue
@@ -51,7 +54,7 @@ class EvaluateHeatmaps( object ):
             pred_com = self.h5_files['avg_model']['coms'][i]
             dist = np.linalg.norm( gt_com - pred_com )
             avg_distances.append( dist )
-        assert len( ens_distances ) > len( avg_distances )
+        assert len( ens_distances ) >= len( avg_distances )
         ens_mean = np.mean( ens_distances )
         avg_mean = np.mean( avg_distances )
         log( f'ens_mean: {ens_mean:.3f} avg_mean: {avg_mean:.3f}' )
