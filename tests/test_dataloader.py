@@ -81,8 +81,9 @@ def test_ann_datamodule():
     loader_iters = [ iter( loader ) for loader in loaders ]
     for i in range(3):
         for loader_iter in loader_iters:
-            img, label, kp = next( loader_iter )
+            img, label, kp, kp_valid = next( loader_iter )
             assert img.shape == ( batch_size, 3, img_size, img_size )
             assert label.shape == ( batch_size, )
             assert kp.shape == ( batch_size, 2 )
+            assert kp_valid.shape == ( batch_size, )
     print( 'Test Passed!' )

@@ -112,7 +112,7 @@ def get_gt_coms( data_dir ):
     root_dir = os.path.dirname( data_dir )
     ann_path = os.path.join(root_dir, 'keypoints.pkl')
     img_to_ann = pickle.load( open( ann_path, 'rb' ) )
-    coms = []
+    img_to_com = {}
     classes, idxs = ['Small', 'Medium', 'Large'], [0, 1, 2]
     for cls, idx in zip(classes, idxs):
         cls_path = os.path.join(data_dir, cls)
@@ -123,8 +123,8 @@ def get_gt_coms( data_dir ):
                 ann = img_to_ann[img]
                 if ann.inconclusive: continue
                 com = np.array( list( ann.keypoint ) )
-                coms.append( com )
-    return coms
+                img_to_com[img] = com
+    return img_to_com
 
 class BeakDataAnn( Dataset ):
 
@@ -146,10 +146,10 @@ class BeakDataAnn( Dataset ):
             cls_images.sort()
             for img in cls_images:
                 if img.endswith(".jpg"):
-                    ann = img_to_ann[img]
-                    if ann.inconclusive: continue
                     img_paths.append( os.path.join(cls_path, img) )
                     labels.append( idx )
+                    # if ann.inconclusive: continue
+                    ann = img_to_ann[img]
                     anns.append( ann )
         return img_paths, labels, anns
 
@@ -158,8 +158,12 @@ class BeakDataAnn( Dataset ):
         img = Image.open(img_path)
         img = self.transforms(img) if self.transforms else img
         ann = self.anns[index]
-        kp = np.array( list(ann.keypoint) )
-        return img, label, kp 
+        kp = np.zeros(2)
+        kp_valid = False
+        if not ann.inconclusive:
+            kp_valid = True
+            kp = np.array( list(ann.keypoint) )
+        return img, label, kp, kp_valid
     
     def __len__( self ):
         return len( self.img_paths )

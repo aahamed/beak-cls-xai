@@ -22,7 +22,7 @@ def get_model():
     model.eval()
     return model    
 
-def test_explainer( xai_method ):
+def explainer_test( xai_method ):
     print(f'Testing xai method: {xai_method}')
     # import pdb; pdb.set_trace()
     model = get_model()
@@ -39,20 +39,32 @@ def test_explainer( xai_method ):
 
 def test_gradcam():
     xai_method = 'gradcam'
-    test_explainer( xai_method )
+    explainer_test( xai_method )
+
+def test_guided_gradcam():
+    xai_method = 'guided-gradcam'
+    explainer_test( xai_method )
 
 def test_ig():
     xai_method = 'integrated-gradients'
-    test_explainer( xai_method )
+    explainer_test( xai_method )
 
 def test_saliency():
     xai_method = 'saliency'
-    test_explainer( xai_method )
+    explainer_test( xai_method )
 
 def test_lime():
     xai_method = 'lime'
-    test_explainer( xai_method ) 
+    explainer_test( xai_method ) 
 
-def test_xrai():
-    xai_method = 'xrai'
-    test_explainer( xai_method ) 
+#def test_xrai():
+#    xai_method = 'xrai'
+#    explainer_test( xai_method ) 
+
+def test_gshap():
+    xai_method = 'gradient-shap'
+    explainer_test( xai_method ) 
+
+def test_ix_grad():
+    xai_method = 'input-x-gradients'
+    explainer_test( xai_method ) 

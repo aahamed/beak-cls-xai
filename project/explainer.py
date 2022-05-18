@@ -36,6 +36,10 @@ def get_explainer( xai_method, model ):
     elif xai_method == 'xrai':
         conv_layer = get_conv_layer_gradcam( model )
         return XraiExplainer( model, conv_layer )
+    elif xai_method == 'input-x-gradients':
+        return InputXGradExplainer( model )
+    elif xai_method == 'gradient-shap':
+        return GShapExplainer( model )
     else:
         raise Exception(f'Unsupported xai-method: {xai_method}')
 
@@ -59,6 +63,7 @@ class Explainer( object ):
         # target = torch.tensor([[target]])
         heatmap = self.method.attribute( img, target=target, **kwargs )
         heatmap = heatmap.mean( dim=1 )
+        heatmap = heatmap.squeeze()
         return heatmap
 
 
@@ -87,6 +92,7 @@ class GuidedGradCamExplainer( Explainer ):
         super().__init__( model )
         self.method = cattr.GuidedGradCam( model, conv_layer )
     
+# Integrated Gradients
 class IGExplainer( Explainer ):
 
     def __init__( self, model ):
@@ -102,6 +108,26 @@ class SaliencyExplainer( Explainer ):
     def explain( self, img, target ):
         kwargs = {'abs':False}
         heatmap = super().explain(img, target, **kwargs)
+        return heatmap
+
+class InputXGradExplainer( Explainer ):
+
+    def __init__( self, model ):
+        super().__init__( model )
+        self.method = cattr.InputXGradient(model)
+
+class GShapExplainer( Explainer ):
+
+    def __init__( self, model ):
+        super().__init__( model )
+        self.method = cattr.GradientShap(model)
+
+    def explain( self, img, target ):
+        rand_img_dist = torch.cat([img * 0, img * 1])
+        heatmap = self.method.attribute( img, target=target,
+            n_samples=50, stdevs=1e-4, baselines=rand_img_dist )
+        heatmap = heatmap.mean( dim=1 )
+        heatmap = heatmap.squeeze()
         return heatmap
 
 class LimeExplainer( Explainer ):

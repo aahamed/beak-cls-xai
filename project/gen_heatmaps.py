@@ -96,7 +96,7 @@ def main():
             help='path to model')
     parser.add_argument('--xai-method', type=str, default='gradcam',
             choices=['gradcam', 'guided-gradcam', 'integrated-gradients',
-                'saliency', 'lime', 'xrai'],
+                'saliency', 'lime', 'xrai', 'input-x-gradients', 'gradient-shap'],
             help='XAI method')
     parser.add_argument('--out-dir', type=str,
             help='Directory to store outputs')
