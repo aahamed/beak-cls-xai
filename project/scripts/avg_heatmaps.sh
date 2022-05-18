@@ -1,6 +1,6 @@
 #!/bin/bash
-xai_method=guided-gradcam
-ens_name=ens4
+xai_method=gradient-shap
+ens_name=ens5
 python avg_heatmaps.py \
 	--heatmap-path lightning_logs/$ens_name/version_0/checkpoints/$xai_method.h5 \
 	lightning_logs/$ens_name/version_1/checkpoints/$xai_method.h5 \

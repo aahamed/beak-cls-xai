@@ -1,6 +1,6 @@
 #!/bin/bash
-xai_method=guided-gradcam
-ens_name=ens4
+xai_method=gradient-shap
+ens_name=ens5
 for ((i=0; i<10;i+=1))
 do
 	python gen_heatmaps.py \
